@@ -7,6 +7,7 @@ const storageKeys = {
 };
 
 const localBackendOrigin = "http://127.0.0.1:5000";
+const staticDataVersion = "2026-08-10-2";
 
 function isApiPath(url) {
   return typeof url === "string" && url.startsWith("/api/");
@@ -94,7 +95,7 @@ function localVotes() {
 
 async function staticCandidates() {
   try {
-    const response = await fetch("data/candidates.json", { cache: "no-store" });
+    const response = await fetch(`data/candidates.json?v=${staticDataVersion}`, { cache: "no-store" });
     if (response.ok) return response.json();
   } catch {
     // The hard-coded list below is only used when the static data file is not available.
@@ -634,6 +635,15 @@ async function initAdminCandidateEditor() {
     list.innerHTML = candidates.map((candidate) => renderAdminCandidate(candidate, candidate.id === selectedCandidateId)).join("");
   };
 
+  const refreshCandidates = async (candidateId = "") => {
+    candidates = await getJson("/api/candidates");
+    selectedCandidateId = candidateId || candidates[0]?.id || "";
+    renderList();
+    const selected = candidates.find((current) => current.id === selectedCandidateId);
+    if (selected) fillCandidateEditor(selected);
+    else clearCandidateEditor();
+  };
+
   renderList();
   if (candidates[0]) fillCandidateEditor(candidates[0]);
 
@@ -676,12 +686,8 @@ async function initAdminCandidateEditor() {
     status.textContent = "Eliminando candidato...";
     try {
       await getJson(`/api/candidates/${candidateId}`, { method: "DELETE" });
-      candidates = await getJson("/api/candidates");
-      selectedCandidateId = candidates[0]?.id || "";
-      renderList();
-      if (candidates[0]) fillCandidateEditor(candidates[0]);
-      else clearCandidateEditor();
-      status.textContent = "Candidato eliminado.";
+      await refreshCandidates();
+      document.querySelector("#candidateEditorStatus").textContent = "Candidato eliminado. El tarjetón local ya fue actualizado.";
     } catch (error) {
       status.textContent = error.message;
     }
@@ -711,11 +717,8 @@ async function initAdminCandidateEditor() {
         method: candidateId ? "PUT" : "POST",
         body: JSON.stringify(payload),
       });
-      candidates = await getJson("/api/candidates");
-      selectedCandidateId = response.candidate.id;
-      renderList();
-      fillCandidateEditor(response.candidate);
-      status.textContent = "Cambios guardados. El tarjetón ya usa esta información.";
+      await refreshCandidates(response.candidate.id);
+      document.querySelector("#candidateEditorStatus").textContent = "Cambios guardados. El tarjetón local ya usa esta información.";
     } catch (error) {
       status.textContent = error.message;
     }
