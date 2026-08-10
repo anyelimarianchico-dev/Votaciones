@@ -514,6 +514,31 @@ a:hover {
 }
 
 @media (max-width: 575.98px) {
+  main.container {
+    padding-left: .85rem;
+    padding-right: .85rem;
+  }
+
+  .navbar .container {
+    min-height: 3.75rem;
+  }
+
+  .navbar .ms-auto {
+    flex-wrap: wrap;
+    justify-content: flex-end;
+  }
+
+  .navbar .btn {
+    padding: .45rem .65rem;
+    font-size: .86rem;
+  }
+
+  .display-5,
+  .display-6 {
+    font-size: 2rem;
+    line-height: 1.1;
+  }
+
   .panel,
   .metric-card,
   .journey-card,
@@ -528,6 +553,37 @@ a:hover {
 
   .stepper small {
     display: none;
+  }
+
+  .metric-number {
+    font-size: 3rem;
+  }
+
+  .admin-candidate-item {
+    padding: .7rem;
+  }
+
+  .admin-candidate-item .avatar {
+    width: 3.3rem;
+    height: 3.3rem;
+  }
+
+  .candidate-photo-preview {
+    width: 4.5rem;
+    height: 4.5rem;
+  }
+
+  .report-table th,
+  .report-table td {
+    padding: .55rem .55rem;
+  }
+
+  .report-number {
+    width: 2.7rem;
+  }
+
+  .report-candidate small {
+    font-size: .75rem;
   }
 }
 

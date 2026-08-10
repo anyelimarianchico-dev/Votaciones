@@ -19,7 +19,7 @@ FRONTEND_DIR = ROOT_DIR / "frontend"
 
 app = Flask(__name__, static_folder=str(FRONTEND_DIR), static_url_path="")
 app.config["SECRET_KEY"] = "sena-vota-admin-session-2026"
-CORS(app)
+CORS(app, supports_credentials=True)
 
 ADMIN_PASSWORD = "Adminos_2026"
 ADMIN_PAGE_PATHS = {
@@ -78,16 +78,37 @@ def home():
     return send_page("index.html")
 
 
+def clean_admin_next(raw_next: str | None) -> str:
+    allowed = {"admin.html", "/admin.html", "/admin", "resultados.html", "/resultados.html", "reportes.html", "/reportes.html"}
+    next_page = raw_next or "admin.html"
+    if next_page not in allowed:
+        return "admin.html"
+    if next_page == "/admin":
+        return "admin.html"
+    return next_page.lstrip("/")
+
+
 @app.get("/admin-login")
 @app.get("/admin-login.html")
 def admin_login_page():
     return send_page("admin-login.html")
 
 
+@app.post("/admin-login")
+def admin_login_form():
+    password = str(request.form.get("password") or "").strip()
+    next_page = clean_admin_next(request.form.get("next"))
+    if password != ADMIN_PASSWORD:
+        return redirect(f"/admin-login.html?error=1&next={next_page}")
+    session["admin_authenticated"] = True
+    return redirect(f"/{next_page}")
+
+
 @app.post("/api/admin/login")
 def admin_login():
     payload = request.get_json(silent=True) or {}
-    if payload.get("password") != ADMIN_PASSWORD:
+    password = str(payload.get("password") or "").strip()
+    if password != ADMIN_PASSWORD:
         return jsonify({"message": "Clave incorrecta"}), 401
     session["admin_authenticated"] = True
     return jsonify({"message": "Acceso permitido"})
