@@ -1,0 +1,79 @@
+[
+  {
+    "id": "ruth",
+    "number": "01",
+    "name": "Ruth",
+    "journey": "Diurna",
+    "ficha": "2874521",
+    "program": "tecnologo-en-analisis-y-desarrollo-de-software",
+    "program_label": "Tecnólogo en Análisis y Desarrollo de Software",
+    "photo": "assets/candidate-ruth.jpg",
+    "proposal": "Fortalecer la comunicación entre aprendices e instructores, crear espacios de apoyo académico y promover actividades de integración para la jornada diurna."
+  },
+  {
+    "id": "carlos",
+    "number": "02",
+    "name": "Carlos Gómez",
+    "journey": "Mixta",
+    "ficha": "2874522",
+    "program": "contabilizacion-de-operaciones",
+    "program_label": "Técnico en Contabilización de Operaciones",
+    "photo": "assets/candidate-carlos.png",
+    "proposal": "Impulsar jornadas de acompañamiento para proyectos formativos, mejorar la organización de horarios y abrir canales de escucha para aprendices de jornada mixta."
+  },
+  {
+    "id": "diana",
+    "number": "03",
+    "name": "Diana Ruiz",
+    "journey": "Virtual",
+    "ficha": "2874523",
+    "program": "analisis-y-desarrollo-de-software",
+    "program_label": "Tecnólogo en Análisis y Desarrollo de Software",
+    "photo": "assets/candidate-diana.png",
+    "proposal": "Crear grupos de apoyo virtual, promover encuentros de seguimiento académico y facilitar la participación de aprendices que estudian desde casa."
+  },
+  {
+    "id": "andres",
+    "number": "04",
+    "name": "Andrés Vargas",
+    "journey": "Diurna",
+    "ficha": "2874524",
+    "program": "contabilizacion-de-operaciones",
+    "program_label": "Técnico en Contabilización de Operaciones",
+    "photo": "assets/candidate-andres.png",
+    "proposal": "Gestionar actividades de bienestar, apoyar la participación en eventos institucionales y representar necesidades de los aprendices ante coordinación."
+  },
+  {
+    "id": "candidate-e727e291",
+    "number": "05",
+    "name": "Mijal Abello",
+    "journey": "Virtual",
+    "ficha": "1654416",
+    "program": "sistemas-integrados-de-gestion",
+    "program_label": "Sistemas Integrados de Gestión",
+    "photo": "assets/candidate-mijal.png",
+    "proposal": "Gestionar las necesidades de los aprendices."
+  },
+  {
+    "id": "candidate-af6c81b0",
+    "number": "06",
+    "name": "Oreste Suárez",
+    "journey": "Mixta",
+    "ficha": "3115086",
+    "program": "tecnologo-en-analisis-y-desarrollo-de-software",
+    "program_label": "Tecnólogo en Análisis y Desarrollo de Software",
+    "photo": "assets/candidate-candidate-af6c81b0.jpg",
+    "proposal": "Gestionar que los recursos se usen para mejorar la batería sanitaria del centro de formación."
+  },
+  {
+    "id": "blanco",
+    "number": "--",
+    "name": "Voto en Blanco",
+    "journey": "Todas",
+    "ficha": "",
+    "program": "todos",
+    "program_label": "Todos los programas",
+    "photo": "",
+    "proposal": "El voto en blanco permite participar sin apoyar una candidatura específica."
+  }
+]

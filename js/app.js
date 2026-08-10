@@ -6,6 +6,24 @@ const storageKeys = {
   votes: "sena_vote_counts_v2",
 };
 
+const localBackendOrigin = "http://127.0.0.1:5000";
+
+function isApiPath(url) {
+  return typeof url === "string" && url.startsWith("/api/");
+}
+
+function apiEndpoint(url) {
+  if (!isApiPath(url)) return url;
+  const isFlaskOrigin = ["127.0.0.1:5000", "localhost:5000"].includes(window.location.host);
+  return isFlaskOrigin ? url : `${localBackendOrigin}${url}`;
+}
+
+function adminLoginUrl(nextPage = "admin.html") {
+  const isFlaskOrigin = ["127.0.0.1:5000", "localhost:5000"].includes(window.location.host);
+  const base = isFlaskOrigin ? "" : localBackendOrigin;
+  return `${base}/admin-login.html?next=${encodeURIComponent(nextPage)}`;
+}
+
 const fallbackCandidates = [
   {
     id: "ruth",
@@ -74,10 +92,20 @@ function localVotes() {
   }
 }
 
-function buildFallbackResults() {
+async function staticCandidates() {
+  try {
+    const response = await fetch("data/candidates.json", { cache: "no-store" });
+    if (response.ok) return response.json();
+  } catch {
+    // The hard-coded list below is only used when the static data file is not available.
+  }
+  return fallbackCandidates;
+}
+
+function buildFallbackResults(candidateSource = fallbackCandidates) {
   const votes = localVotes();
   const total = Object.values(votes).reduce((sum, value) => sum + value, 0);
-  const candidates = fallbackCandidates
+  const candidates = candidateSource
     .map((candidate) => ({
       ...candidate,
       votes: votes[candidate.id] || 0,
@@ -90,7 +118,7 @@ function buildFallbackResults() {
     last_update: new Date().toLocaleString("es-CO"),
     candidates,
     participation: ["Diurna", "Mixta", "Virtual"].map((journey) => {
-      const count = fallbackCandidates
+      const count = candidateSource
         .filter((candidate) => candidate.journey === journey)
         .reduce((sum, candidate) => sum + (votes[candidate.id] || 0), 0);
       return {
@@ -102,18 +130,19 @@ function buildFallbackResults() {
   };
 }
 
-function fallbackResponse(url, options = {}) {
+async function fallbackResponse(url, options = {}) {
   if (url.includes("/api/candidates") && ["POST", "PUT", "DELETE"].includes(options.method)) {
     throw new Error("Para administrar candidatos, inicia el backend Flask.");
   }
-  if (url.includes("/api/candidates")) return fallbackCandidates;
-  if (url.includes("/api/results") || url.includes("/api/reports")) return buildFallbackResults();
+  const candidates = await staticCandidates();
+  if (url.includes("/api/candidates")) return candidates;
+  if (url.includes("/api/results") || url.includes("/api/reports")) return buildFallbackResults(candidates);
   if (url.includes("/api/vote") && options.method === "POST") {
     const payload = JSON.parse(options.body || "{}");
     const votes = localVotes();
     votes[payload.candidate_id] = (votes[payload.candidate_id] || 0) + 1;
     localStorage.setItem(storageKeys.votes, JSON.stringify(votes));
-    return { message: "Voto registrado localmente", results: buildFallbackResults() };
+    return { message: "Voto registrado localmente", results: buildFallbackResults(candidates) };
   }
   throw new Error("No hay datos disponibles");
 }
@@ -121,8 +150,9 @@ function fallbackResponse(url, options = {}) {
 async function getJson(url, options = {}) {
   let response;
   try {
-    response = await fetch(url, {
+    response = await fetch(apiEndpoint(url), {
       headers: { "Content-Type": "application/json" },
+      credentials: "include",
       ...options,
     });
   } catch {
@@ -132,7 +162,7 @@ async function getJson(url, options = {}) {
   if (!response.ok) {
     if (response.status === 401) {
       if (url.includes("/api/results") || url.includes("/api/reports") || (url.includes("/api/candidates") && options.method)) {
-        window.location.replace(`/admin-login.html?next=${encodeURIComponent(window.location.pathname)}`);
+        window.location.replace(adminLoginUrl(window.location.pathname.split("/").pop() || "admin.html"));
       }
       throw new Error("Clave de acceso requerida");
     }
@@ -226,7 +256,10 @@ async function initVotingForm() {
   if (journeyLabel) journeyLabel.textContent = selectedJourney;
 
   const allCandidates = await getJson("/api/candidates");
-  const candidates = allCandidates.filter((candidate) => candidate.journey === selectedJourney || candidate.journey === "Todas");
+  const candidates = [
+    ...allCandidates.filter((candidate) => candidate.id !== "blanco" && candidate.journey === selectedJourney),
+    ...allCandidates.filter((candidate) => candidate.id === "blanco"),
+  ];
   if (!candidates.length) {
     grid.innerHTML = `
       <div class="col-12">
@@ -463,7 +496,7 @@ function downloadCsv(rows) {
 
 async function downloadPdf() {
   try {
-    const response = await fetch("/api/reports/pdf");
+    const response = await fetch(apiEndpoint("/api/reports/pdf"), { credentials: "include" });
     if (!response.ok) throw new Error("PDF no disponible");
     const blob = await response.blob();
     const url = URL.createObjectURL(blob);
