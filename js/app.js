@@ -135,16 +135,12 @@ async function fallbackResponse(url, options = {}) {
   if (url.includes("/api/candidates") && ["POST", "PUT", "DELETE"].includes(options.method)) {
     throw new Error("Para administrar candidatos, inicia el backend Flask.");
   }
+  if (url.includes("/api/vote") && options.method === "POST") {
+    throw new Error("Abre la app desde http://127.0.0.1:5000 para guardar votos reales.");
+  }
   const candidates = await staticCandidates();
   if (url.includes("/api/candidates")) return candidates;
   if (url.includes("/api/results") || url.includes("/api/reports")) return buildFallbackResults(candidates);
-  if (url.includes("/api/vote") && options.method === "POST") {
-    const payload = JSON.parse(options.body || "{}");
-    const votes = localVotes();
-    votes[payload.candidate_id] = (votes[payload.candidate_id] || 0) + 1;
-    localStorage.setItem(storageKeys.votes, JSON.stringify(votes));
-    return { message: "Voto registrado localmente", results: buildFallbackResults(candidates) };
-  }
   throw new Error("No hay datos disponibles");
 }
 
