@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import json
+import base64
+import re
 from datetime import datetime
 from pathlib import Path
 from typing import Any
@@ -8,7 +10,11 @@ from uuid import uuid4
 
 
 BASE_DIR = Path(__file__).resolve().parent
+ROOT_DIR = BASE_DIR.parent
 DATA_DIR = BASE_DIR / "data"
+ASSETS_DIR = ROOT_DIR / "frontend" / "assets"
+FRONTEND_DATA_DIR = ROOT_DIR / "frontend" / "data"
+FRONTEND_CANDIDATES_FILE = FRONTEND_DATA_DIR / "candidates.json"
 VOTES_FILE = DATA_DIR / "votes.json"
 CANDIDATES_FILE = DATA_DIR / "candidates.json"
 
@@ -73,6 +79,11 @@ DEFAULT_CANDIDATES: list[dict[str, str]] = [
 
 EMPTY_STORE: dict[str, Any] = {"last_id": 0, "votes": []}
 CANDIDATE_FIELDS = ["id", "number", "name", "journey", "ficha", "program", "program_label", "photo", "proposal"]
+PHOTO_MIME_EXTENSIONS = {
+    "image/jpeg": "jpg",
+    "image/png": "png",
+    "image/webp": "webp",
+}
 
 
 def ensure_data_files() -> None:
@@ -136,7 +147,10 @@ def load_candidates() -> list[dict[str, str]]:
 
 def save_candidates(candidates: list[dict[str, str]]) -> None:
     DATA_DIR.mkdir(parents=True, exist_ok=True)
-    CANDIDATES_FILE.write_text(json.dumps(candidates, indent=2, ensure_ascii=False), encoding="utf-8")
+    FRONTEND_DATA_DIR.mkdir(parents=True, exist_ok=True)
+    data = json.dumps(candidates, indent=2, ensure_ascii=False)
+    CANDIDATES_FILE.write_text(data, encoding="utf-8")
+    FRONTEND_CANDIDATES_FILE.write_text(data, encoding="utf-8")
 
 
 def next_candidate_number(candidates: list[dict[str, str]]) -> str:
@@ -144,19 +158,36 @@ def next_candidate_number(candidates: list[dict[str, str]]) -> str:
     return str(max(numeric_numbers, default=0) + 1).zfill(2)
 
 
+def save_candidate_photo(candidate_id: str, photo: str) -> str:
+    if not photo.startswith("data:image/"):
+        return photo
+
+    match = re.match(r"^data:(image/(?:jpeg|png|webp));base64,(.+)$", photo, flags=re.DOTALL)
+    if not match:
+        return ""
+
+    mime_type, encoded = match.groups()
+    extension = PHOTO_MIME_EXTENSIONS.get(mime_type, "jpg")
+    ASSETS_DIR.mkdir(parents=True, exist_ok=True)
+    photo_path = ASSETS_DIR / f"candidate-{candidate_id}.{extension}"
+    photo_path.write_bytes(base64.b64decode(encoded))
+    return f"assets/{photo_path.name}"
+
+
 def build_candidate_payload(payload: dict[str, Any], candidates: list[dict[str, str]]) -> dict[str, str]:
     program_label = str(payload.get("program_label") or "").strip()
     program = str(payload.get("program") or program_label.lower().replace(" ", "-") or "sin-programa").strip()
+    candidate_id = f"candidate-{uuid4().hex[:8]}"
     return normalize_candidate(
         {
-            "id": f"candidate-{uuid4().hex[:8]}",
+            "id": candidate_id,
             "number": next_candidate_number(candidates),
             "name": str(payload.get("name") or "Nuevo candidato").strip(),
             "journey": str(payload.get("journey") or "Diurna").strip(),
             "ficha": str(payload.get("ficha") or "").strip(),
             "program": program,
             "program_label": program_label or "Programa no registrado",
-            "photo": str(payload.get("photo") or "").strip(),
+            "photo": save_candidate_photo(candidate_id, str(payload.get("photo") or "").strip()),
             "proposal": str(payload.get("proposal") or "").strip(),
         }
     )
@@ -193,7 +224,8 @@ def update_candidate(candidate_id: str, payload: dict[str, Any]) -> dict[str, st
         if candidate["id"] == candidate_id:
             for field in editable_fields:
                 if field in payload:
-                    candidate[field] = str(payload[field]).strip()
+                    value = str(payload[field]).strip()
+                    candidate[field] = save_candidate_photo(candidate_id, value) if field == "photo" else value
             save_candidates(candidates)
             return candidate
     raise ValueError("Candidato no válido")
