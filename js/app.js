@@ -130,6 +130,12 @@ async function getJson(url, options = {}) {
   }
 
   if (!response.ok) {
+    if (response.status === 401) {
+      if (url.includes("/api/results") || url.includes("/api/reports") || (url.includes("/api/candidates") && options.method)) {
+        window.location.replace(`/admin-login.html?next=${encodeURIComponent(window.location.pathname)}`);
+      }
+      throw new Error("Clave de acceso requerida");
+    }
     if (url.includes("/api/")) return fallbackResponse(url, options);
     const error = await response.json().catch(() => ({ message: "Error de servidor" }));
     throw new Error(error.message);
@@ -396,14 +402,19 @@ async function initResults() {
 
   const loadResults = async () => {
     const data = await getJson("/api/results");
-    document.querySelector("#lastUpdate").textContent = data.last_update;
+    const lastUpdate = document.querySelector("#lastUpdate");
+    if (lastUpdate) lastUpdate.textContent = data.last_update;
     totalVotes.textContent = formatNumber.format(data.total);
     candidateSummary.innerHTML = data.candidates.map(renderCandidateSummary).join("");
-    document.querySelector("#participationList").innerHTML = data.participation.map(renderParticipation).join("");
+    const participationList = document.querySelector("#participationList");
+    if (participationList) participationList.innerHTML = data.participation.map(renderParticipation).join("");
   };
 
   await loadResults();
   document.querySelector("#refreshResults")?.addEventListener("click", loadResults);
+  window.setInterval(() => {
+    loadResults().catch((error) => console.error(error));
+  }, 2500);
 }
 
 function initials(name) {
@@ -470,8 +481,10 @@ async function initReports() {
   const table = document.querySelector("#reportTable");
   if (!table) return;
 
-  const data = await getJson("/api/reports");
+  let data = await getJson("/api/reports");
   let currentRows = data.candidates;
+  let currentJourney = "todas";
+  let currentProgram = "todos";
 
   const render = () => {
     table.innerHTML = currentRows.map(renderReportRow).join("");
@@ -480,14 +493,19 @@ async function initReports() {
   };
 
   const applyFilters = () => {
-    const journey = document.querySelector("#jornada").value;
-    const program = document.querySelector("#programa").value;
+    currentJourney = document.querySelector("#jornada").value;
+    currentProgram = document.querySelector("#programa").value;
     currentRows = data.candidates.filter((row) => {
-      const matchesJourney = journey === "todas" || row.journey === journey || row.journey === "Todas";
-      const matchesProgram = program === "todos" || row.program === program || row.program === "todos";
+      const matchesJourney = currentJourney === "todas" || row.journey === currentJourney || row.journey === "Todas";
+      const matchesProgram = currentProgram === "todos" || row.program === currentProgram || row.program === "todos";
       return matchesJourney && matchesProgram;
     });
     render();
+  };
+
+  const refreshReports = async () => {
+    data = await getJson("/api/reports");
+    applyFilters();
   };
 
   render();
@@ -503,6 +521,9 @@ async function initReports() {
   });
   document.querySelector("#downloadCsv").addEventListener("click", () => downloadCsv(currentRows));
   document.querySelector("#downloadPdf").addEventListener("click", downloadPdf);
+  window.setInterval(() => {
+    refreshReports().catch((error) => console.error(error));
+  }, 4000);
 }
 
 function initHelp() {

@@ -12,8 +12,9 @@
     <main class="container py-5">
       <section class="mx-auto panel" style="max-width: 420px;">
         <h1 class="h3 fw-bold text-center mb-4">Administrador</h1>
-        <form id="adminLoginForm" class="vstack gap-3">
-          <input id="adminPassword" class="form-control form-control-lg" type="password" placeholder="Contraseña" autocomplete="current-password" required autofocus>
+        <form id="adminLoginForm" class="vstack gap-3" method="post" action="http://127.0.0.1:5000/admin-login">
+          <input id="adminNext" type="hidden" name="next" value="admin.html">
+          <input id="adminPassword" name="password" class="form-control form-control-lg" type="password" placeholder="Contraseña" autocomplete="current-password" required autofocus>
           <button class="btn btn-success btn-lg" type="submit">Entrar</button>
           <small id="adminLoginStatus" class="text-danger text-center"></small>
         </form>
@@ -21,27 +22,12 @@
     </main>
 
     <script>
-      document.querySelector("#adminLoginForm").addEventListener("submit", async (event) => {
-        event.preventDefault();
-        const status = document.querySelector("#adminLoginStatus");
-        const password = document.querySelector("#adminPassword").value;
-        const next = new URLSearchParams(window.location.search).get("next") || "/admin";
-        status.textContent = "";
-
-        const response = await fetch("/api/admin/login", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ password }),
-          cache: "no-store",
-        });
-
-        if (!response.ok) {
-          status.textContent = "Contraseña incorrecta.";
-          return;
-        }
-
-        window.location.href = next;
-      });
+      const params = new URLSearchParams(window.location.search);
+      const next = params.get("next");
+      if (next) document.querySelector("#adminNext").value = next.replace(/^\/+/, "");
+      if (params.get("error") === "1") {
+        document.querySelector("#adminLoginStatus").textContent = "Contraseña incorrecta.";
+      }
     </script>
   </body>
 </html>

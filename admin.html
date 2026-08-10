@@ -13,24 +13,43 @@
     <nav class="navbar navbar-expand-lg bg-white sticky-top">
       <div class="container">
         <a class="navbar-brand fw-bold text-sena" href="index.html"><img class="sena-logo" src="assets/logo-sena.png" alt="Logo SENA"><span>SENA Vota</span></a>
-        <div class="ms-auto">
-          <a class="btn btn-outline-success" href="index.html">Volver a votación</a>
+        <div class="ms-auto d-flex gap-2">
+          <a class="btn btn-outline-success" href="reportes.html">Reportes</a>
+          <a class="btn btn-outline-dark" href="index.html">Votación</a>
         </div>
       </div>
     </nav>
 
     <main class="container py-5">
-      <section class="hero-band">
-        <div class="row align-items-center g-4">
-          <div class="col-lg-9">
-            <p class="eyebrow">Administración</p>
-            <h1 class="display-6 fw-bold">Gestión de candidatos</h1>
-            <p class="lead text-secondary mb-0">Agrega, edita o retira candidatos. Los cambios quedan guardados y se reflejan en el tarjetón.</p>
-          </div>
+      <section class="d-flex flex-column flex-lg-row justify-content-between gap-3 border-bottom pb-4">
+        <div>
+          <p class="eyebrow">Administrador</p>
+          <h1 class="h2 fw-bold">Panel de administración</h1>
+          <p class="text-secondary mb-0">Gestiona candidatos y revisa las estadísticas en vivo.</p>
+        </div>
+        <div class="text-lg-end">
+          <span class="eyebrow">Actualización en vivo</span>
+          <div class="h6 text-sena mb-0"><i class="bi bi-arrow-repeat me-2"></i><span id="lastUpdate">Cargando...</span></div>
         </div>
       </section>
 
-      <section class="row g-4 mt-4">
+      <section class="row g-4 mt-1">
+        <div class="col-lg-4">
+          <article class="metric-card h-100">
+            <span class="eyebrow">Votos registrados</span>
+            <strong id="totalVotes" class="metric-number">0</strong>
+            <span class="live-pill"><i class="bi bi-circle-fill"></i> En vivo</span>
+          </article>
+        </div>
+        <div class="col-lg-8">
+          <article class="panel h-100">
+            <h2 class="h4 fw-bold mb-3">Resultados por candidato</h2>
+            <div id="candidateSummary" class="vstack gap-3"></div>
+          </article>
+        </div>
+      </section>
+
+      <section class="row g-4 mt-2">
         <div class="col-lg-5">
           <article class="panel h-100">
             <p class="eyebrow">Candidatos</p>
