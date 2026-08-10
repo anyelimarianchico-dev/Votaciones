@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Administración - SENA Vota</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
+    <link href="css/styles.css" rel="stylesheet">
+  </head>
+  <body>
+    <div class="brand-strip"></div>
+    <nav class="navbar navbar-expand-lg bg-white sticky-top">
+      <div class="container">
+        <a class="navbar-brand fw-bold text-sena" href="index.html"><img class="sena-logo" src="assets/logo-sena.png" alt="Logo SENA"><span>SENA Vota</span></a>
+        <div class="ms-auto">
+          <a class="btn btn-outline-success" href="index.html">Volver a votación</a>
+        </div>
+      </div>
+    </nav>
+
+    <main class="container py-5">
+      <section class="hero-band">
+        <div class="row align-items-center g-4">
+          <div class="col-lg-9">
+            <p class="eyebrow">Administración</p>
+            <h1 class="display-6 fw-bold">Gestión de candidatos</h1>
+            <p class="lead text-secondary mb-0">Agrega, edita o retira candidatos. Los cambios quedan guardados y se reflejan en el tarjetón.</p>
+          </div>
+        </div>
+      </section>
+
+      <section class="row g-4 mt-4">
+        <div class="col-lg-5">
+          <article class="panel h-100">
+            <p class="eyebrow">Candidatos</p>
+            <h2 class="h4 fw-bold">Lista editable</h2>
+            <p class="text-secondary">Selecciona un candidato para editarlo.</p>
+            <button id="addCandidateBtn" class="btn btn-outline-success w-100 mb-3" type="button"><i class="bi bi-person-plus me-2"></i>Nuevo candidato</button>
+            <div id="adminCandidateList" class="vstack gap-2"></div>
+          </article>
+        </div>
+        <div class="col-lg-7">
+          <form id="candidateEditorForm" class="panel">
+            <p class="eyebrow">Editor</p>
+            <h2 class="h4 fw-bold mb-3">Datos del candidato</h2>
+            <input type="hidden" id="editCandidateId">
+            <input type="hidden" id="editPhoto">
+            <div class="row g-3">
+              <div class="col-md-6">
+                <label class="form-label" for="editName">Nombre</label>
+                <input id="editName" class="form-control" required>
+              </div>
+              <div class="col-md-6">
+                <label class="form-label" for="editLastName">Apellido</label>
+                <input id="editLastName" class="form-control">
+              </div>
+              <div class="col-md-6">
+                <label class="form-label" for="editJourney">Jornada</label>
+                <select id="editJourney" class="form-select">
+                  <option value="Diurna">Diurna</option>
+                  <option value="Mixta">Mixta</option>
+                  <option value="Virtual">Virtual</option>
+                  <option value="Todas">Todas</option>
+                </select>
+              </div>
+              <div class="col-md-6">
+                <label class="form-label" for="editFicha">Número de ficha</label>
+                <input id="editFicha" class="form-control" placeholder="Ejemplo: 2874521">
+              </div>
+              <div class="col-12">
+                <label class="form-label" for="editProgramLabel">Programa de formación</label>
+                <input id="editProgramLabel" class="form-control" placeholder="Escribe el programa de formación">
+              </div>
+              <div class="col-12">
+                <label class="form-label" for="editPhotoFile">Foto del candidato</label>
+                <input id="editPhotoFile" class="form-control" type="file" accept="image/*">
+                <div class="form-text">Solo se permite cargar la foto desde este equipo.</div>
+                <div class="mt-3">
+                  <img id="candidatePhotoPreview" class="candidate-photo-preview" src="" alt="Foto del candidato">
+                </div>
+              </div>
+              <div class="col-12">
+                <label class="form-label" for="editProposal">Resumen de propuestas</label>
+                <textarea id="editProposal" class="form-control" rows="5" placeholder="Escribe un resumen corto de las propuestas"></textarea>
+              </div>
+            </div>
+            <div class="d-flex flex-column flex-sm-row justify-content-between align-items-sm-center gap-3 mt-4">
+              <button id="deleteCandidateBtn" class="btn btn-link link-danger p-0 text-start d-none" type="button">Eliminar candidato</button>
+              <div class="d-flex flex-column flex-sm-row align-items-sm-center gap-3 ms-sm-auto">
+                <span id="candidateEditorStatus" class="text-secondary small">Selecciona un candidato.</span>
+                <button id="saveCandidateBtn" class="btn btn-success" type="submit"><i class="bi bi-save me-2"></i>Guardar candidato</button>
+              </div>
+            </div>
+          </form>
+        </div>
+      </section>
+    </main>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="js/admin-guard.js"></script>
+    <script src="js/app.js"></script>
+  </body>
+</html>
