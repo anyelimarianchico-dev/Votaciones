@@ -1,0 +1,133 @@
+﻿<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>SENA Vota - Inicio</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
+    <link href="css/styles.css" rel="stylesheet">
+  </head>
+  <body>
+    <div class="brand-strip"></div>
+    <nav class="navbar navbar-expand-lg bg-white sticky-top">
+      <div class="container">
+        <a class="navbar-brand fw-bold text-sena" href="index.html">
+          <img class="sena-logo" src="assets/logo-sena.png" alt="Logo SENA">
+          <span>SENA Vota</span>
+        </a>
+        <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#mainNav" aria-controls="mainNav" aria-expanded="false" aria-label="Abrir menu">
+          <span class="navbar-toggler-icon"></span>
+        </button>
+        <div class="collapse navbar-collapse" id="mainNav">
+          <ul class="navbar-nav ms-auto align-items-lg-center gap-lg-2">
+            <li class="nav-item"><a data-nav class="nav-link" href="index.html">Inicio</a></li>
+            <li class="nav-item"><a data-nav class="nav-link" href="votar.html">Tarjetón</a></li>
+            <li class="nav-item"><a data-nav class="nav-link" href="ayuda.html">Ayuda</a></li>
+          </ul>
+        </div>
+      </div>
+    </nav>
+
+    <main class="container py-5">
+      <section class="hero-band">
+        <div class="row align-items-center g-4">
+          <div class="col-lg-7">
+            <p class="eyebrow">Elecciones de representantes</p>
+            <h1 class="display-5 fw-bold">Votación SENA clara, rápida y conectada</h1>
+            <p class="lead text-secondary">Selecciona tu jornada, revisa el tarjetón y confirma tu voto. Los resultados y reportes están separados del flujo de aprendices.</p>
+            <div class="d-flex flex-wrap gap-2 mt-4">
+              <a class="btn btn-success btn-lg" href="#jornadas"><i class="bi bi-check2-square me-2"></i>Elegir jornada</a>
+              <a class="btn btn-outline-dark btn-lg" href="ayuda.html"><i class="bi bi-question-circle me-2"></i>Centro de ayuda</a>
+            </div>
+          </div>
+          <div class="col-lg-5">
+            <div class="panel">
+              <div class="d-flex align-items-center gap-3">
+                <span class="feature-icon"><i class="bi bi-shield-check"></i></span>
+                <div>
+                  <span class="eyebrow">Estado del proceso</span>
+                  <h2 class="h4 mb-0">Votación abierta</h2>
+                </div>
+              </div>
+              <hr>
+              <div class="d-grid gap-2">
+                <a class="btn btn-outline-success" href="votar.html">Ir al tarjetón</a>
+                <a class="btn btn-outline-success" href="ayuda.html">Ver ayuda</a>
+                <a class="btn btn-outline-dark" href="admin.html">Administración</a>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section id="jornadas" class="section-anchor mt-5">
+        <div class="d-flex flex-column flex-md-row justify-content-between gap-3 mb-3">
+          <div>
+            <p class="eyebrow mb-1">Paso 1</p>
+            <h2 class="h3 fw-bold">Selecciona tu jornada</h2>
+          </div>
+          <span class="status-pill align-self-md-center"><i class="bi bi-router"></i>Navegación conectada</span>
+        </div>
+
+        <div class="row g-4" aria-label="Seleccion de jornada">
+          <div class="col-md-4">
+            <button class="journey-card" data-journey="Diurna">
+              <span class="journey-icon journey-sun"><i class="bi bi-sun"></i></span>
+              <span class="h4 d-block">Diurna</span>
+              <span class="text-secondary d-block">Formación en horario de mañana y tarde.</span>
+              <span class="btn btn-outline-success mt-4">Seleccionar Diurna</span>
+            </button>
+          </div>
+          <div class="col-md-4">
+            <button class="journey-card" data-journey="Mixta">
+              <span class="journey-icon journey-mixed"><i class="bi bi-brightness-alt-high"></i></span>
+              <span class="h4 d-block">Mixta</span>
+              <span class="text-secondary d-block">Horarios flexibles con asistencia presencial.</span>
+              <span class="btn btn-outline-success mt-4">Seleccionar Mixta</span>
+            </button>
+          </div>
+          <div class="col-md-4">
+            <button class="journey-card" data-journey="Virtual">
+              <span class="journey-icon journey-virtual"><i class="bi bi-laptop"></i></span>
+              <span class="h4 d-block">Virtual</span>
+              <span class="text-secondary d-block">Formación en línea a través de plataforma.</span>
+              <span class="btn btn-outline-success mt-4">Seleccionar Virtual</span>
+            </button>
+          </div>
+        </div>
+
+        <div id="selectedJourneyBox" class="panel mt-4 d-none">
+          <div class="d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-3">
+            <div>
+              <span class="eyebrow">Jornada seleccionada</span>
+              <h3 class="h4 mb-0" id="selectedJourneyName">Diurna</h3>
+            </div>
+            <a id="continueBtn" class="btn btn-success btn-lg disabled" aria-disabled="true" href="votar.html">
+              Continuar al tarjetón <i class="bi bi-arrow-right ms-2"></i>
+            </a>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <footer class="site-footer">
+      <div class="container d-flex flex-column flex-lg-row justify-content-between align-items-center gap-3">
+        <span class="d-inline-flex align-items-center gap-2"><img class="sena-logo" src="assets/logo-sena.png" alt=""> <strong>SENA Vota</strong></span>
+        <nav class="d-flex flex-wrap justify-content-center gap-3">
+          <a href="privacidad.html">Políticas de Privacidad</a>
+          <a href="terminos.html">Términos y Condiciones</a>
+          <a href="transparencia.html">Transparencia</a>
+        </nav>
+        <small>© 2026 Servicio Nacional de Aprendizaje (SENA).</small>
+      </div>
+    </footer>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="js/app.js"></script>
+  </body>
+</html>
+
+
+
+

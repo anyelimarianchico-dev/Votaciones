@@ -1,0 +1,57 @@
+[
+  {
+    "id": "ruth",
+    "number": "01",
+    "name": "Ruth",
+    "journey": "Diurna",
+    "ficha": "",
+    "program": "sistemas",
+    "program_label": "Tecnólogo en Análisis y Desarrollo de Software",
+    "photo": "",
+    "proposal": ""
+  },
+  {
+    "id": "carlos",
+    "number": "02",
+    "name": "Carlos Gómez",
+    "journey": "Mixta",
+    "ficha": "",
+    "program": "contabilidad",
+    "program_label": "Técnico en Contabilización de Operaciones",
+    "photo": "",
+    "proposal": ""
+  },
+  {
+    "id": "diana",
+    "number": "03",
+    "name": "Diana Ruiz",
+    "journey": "Virtual",
+    "ficha": "",
+    "program": "sistemas",
+    "program_label": "Tecnólogo en Análisis y Desarrollo de Software",
+    "photo": "",
+    "proposal": ""
+  },
+  {
+    "id": "andres",
+    "number": "04",
+    "name": "Andrés Vargas",
+    "journey": "Diurna",
+    "ficha": "",
+    "program": "contabilidad",
+    "program_label": "Técnico en Contabilización de Operaciones",
+    "photo": "",
+    "proposal": ""
+  },
+  {
+    "id": "blanco",
+    "number": "--",
+    "name": "Voto en Blanco",
+    "journey": "Todas",
+    "ficha": "",
+    "program": "todos",
+    "program_label": "Todos los programas",
+    "photo": "",
+    "proposal": "El voto en blanco permite participar sin apoyar una candidatura específica."
+  }
+]
