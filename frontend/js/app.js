@@ -167,9 +167,8 @@ async function getJson(url, options = {}) {
       }
       throw new Error("Clave de acceso requerida");
     }
-    if (url.includes("/api/")) return fallbackResponse(url, options);
     const error = await response.json().catch(() => ({ message: "Error de servidor" }));
-    throw new Error(error.message);
+    throw new Error(error.message || "Error de servidor");
   }
 
   return response.json();
@@ -346,28 +345,42 @@ function initReview() {
 
   document.querySelector("#confirmVote").addEventListener("click", async () => {
     const button = document.querySelector("#confirmVote");
+    const originalLabel = button.innerHTML;
+    const previousError = document.querySelector("#voteError");
+    if (previousError) previousError.remove();
+
     button.disabled = true;
     button.innerHTML = `<span class="spinner-border spinner-border-sm me-2" aria-hidden="true"></span>Registrando`;
 
-    const response = await getJson("/api/vote", {
-      method: "POST",
-      body: JSON.stringify({
-        candidate_id: selection.candidate_id,
-        journey: selection.journey,
-        program: selection.program,
-      }),
-    });
+    try {
+      const response = await getJson("/api/vote", {
+        method: "POST",
+        body: JSON.stringify({
+          candidate_id: selection.candidate_id,
+          journey: selection.journey,
+          program: selection.program,
+        }),
+      });
 
-    localStorage.setItem(
-      storageKeys.confirmation,
-      JSON.stringify({
-        ...selection,
-        ticket: response.vote?.id ? `SV-${String(response.vote.id).padStart(6, "0")}` : `SV-${Date.now().toString().slice(-8)}`,
-        date: new Date().toLocaleString("es-CO"),
-      })
-    );
+      localStorage.setItem(
+        storageKeys.confirmation,
+        JSON.stringify({
+          ...selection,
+          ticket: response.vote?.id ? `SV-${String(response.vote.id).padStart(6, "0")}` : `SV-${Date.now().toString().slice(-8)}`,
+          date: new Date().toLocaleString("es-CO"),
+        })
+      );
 
-    window.location.href = "confirmacion.html";
+      window.location.href = "confirmacion.html";
+    } catch (error) {
+      button.disabled = false;
+      button.innerHTML = originalLabel;
+      const alert = document.createElement("div");
+      alert.id = "voteError";
+      alert.className = "alert alert-danger mt-3 mb-0";
+      alert.textContent = `No se pudo guardar el voto: ${error.message}`;
+      button.closest(".border-top").after(alert);
+    }
   });
 }
 
