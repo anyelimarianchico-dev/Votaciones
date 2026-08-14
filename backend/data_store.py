@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import base64
 import re
+from json import JSONDecodeError
 from datetime import datetime
 from pathlib import Path
 from typing import Any
@@ -78,7 +79,20 @@ DEFAULT_CANDIDATES: list[dict[str, str]] = [
 ]
 
 EMPTY_STORE: dict[str, Any] = {"last_id": 0, "votes": []}
-CANDIDATE_FIELDS = ["id", "number", "name", "journey", "ficha", "program", "program_label", "photo", "proposal"]
+CANDIDATE_FIELDS = [
+    "id",
+    "number",
+    "name",
+    "journey",
+    "ficha",
+    "program",
+    "program_label",
+    "photo",
+    "photo_fit",
+    "photo_position",
+    "photo_size",
+    "proposal",
+]
 PHOTO_MIME_EXTENSIONS = {
     "image/jpeg": "jpg",
     "image/png": "png",
@@ -108,6 +122,9 @@ def normalize_candidate(candidate: dict[str, Any]) -> dict[str, str]:
         "program": str(candidate.get("program") or "sin-programa"),
         "program_label": str(candidate.get("program_label") or candidate.get("program") or "Programa no registrado"),
         "photo": str(candidate.get("photo") or ""),
+        "photo_fit": str(candidate.get("photo_fit") or "cover"),
+        "photo_position": str(candidate.get("photo_position") or "center 35%"),
+        "photo_size": str(candidate.get("photo_size") or candidate.get("photo_fit") or "cover"),
         "proposal": str(candidate.get("proposal") or ""),
     }
     if normalized["id"] == "blanco":
@@ -117,8 +134,12 @@ def normalize_candidate(candidate: dict[str, Any]) -> dict[str, str]:
 
 def load_candidates() -> list[dict[str, str]]:
     ensure_data_files()
-    with CANDIDATES_FILE.open("r", encoding="utf-8-sig") as file:
-        raw_candidates: Any = json.load(file)
+    try:
+        with CANDIDATES_FILE.open("r", encoding="utf-8-sig") as file:
+            raw_candidates: Any = json.load(file)
+    except (JSONDecodeError, OSError):
+        save_candidates(DEFAULT_CANDIDATES)
+        return [candidate.copy() for candidate in DEFAULT_CANDIDATES]
 
     if not isinstance(raw_candidates, list):
         save_candidates(DEFAULT_CANDIDATES)
@@ -126,22 +147,32 @@ def load_candidates() -> list[dict[str, str]]:
 
     candidates: list[dict[str, str]] = []
     seen_ids: set[str] = set()
+    changed = False
     for raw_candidate in raw_candidates:
         if not isinstance(raw_candidate, dict):
+            changed = True
             continue
         candidate = normalize_candidate(raw_candidate)
+        if any(raw_candidate.get(key) != candidate[key] for key in CANDIDATE_FIELDS):
+            changed = True
         if candidate["id"] in seen_ids:
+            changed = True
             continue
         seen_ids.add(candidate["id"])
         candidates.append(candidate)
 
     if "blanco" not in seen_ids:
         candidates.append(blank_candidate())
+        changed = True
 
-    candidates = [candidate for candidate in candidates if candidate["id"] != "blanco"] + [
+    ordered_candidates = [candidate for candidate in candidates if candidate["id"] != "blanco"] + [
         candidate for candidate in candidates if candidate["id"] == "blanco"
     ]
-    save_candidates(candidates)
+    if ordered_candidates != candidates:
+        changed = True
+    candidates = ordered_candidates
+    if changed:
+        save_candidates(candidates)
     return candidates
 
 
@@ -149,8 +180,14 @@ def save_candidates(candidates: list[dict[str, str]]) -> None:
     DATA_DIR.mkdir(parents=True, exist_ok=True)
     FRONTEND_DATA_DIR.mkdir(parents=True, exist_ok=True)
     data = json.dumps(candidates, indent=2, ensure_ascii=False)
-    CANDIDATES_FILE.write_text(data, encoding="utf-8")
-    FRONTEND_CANDIDATES_FILE.write_text(data, encoding="utf-8")
+    write_json_text(CANDIDATES_FILE, data)
+    write_json_text(FRONTEND_CANDIDATES_FILE, data)
+
+
+def write_json_text(path: Path, data: str) -> None:
+    temp_path = path.with_name(f"{path.name}.{uuid4().hex}.tmp")
+    temp_path.write_text(data, encoding="utf-8")
+    temp_path.replace(path)
 
 
 def next_candidate_number(candidates: list[dict[str, str]]) -> str:
@@ -169,7 +206,7 @@ def save_candidate_photo(candidate_id: str, photo: str) -> str:
     mime_type, encoded = match.groups()
     extension = PHOTO_MIME_EXTENSIONS.get(mime_type, "jpg")
     ASSETS_DIR.mkdir(parents=True, exist_ok=True)
-    photo_path = ASSETS_DIR / f"candidate-{candidate_id}.{extension}"
+    photo_path = ASSETS_DIR / f"candidate-{candidate_id}-{uuid4().hex[:8]}.{extension}"
     photo_path.write_bytes(base64.b64decode(encoded))
     return f"assets/{photo_path.name}"
 
@@ -188,6 +225,9 @@ def build_candidate_payload(payload: dict[str, Any], candidates: list[dict[str, 
             "program": program,
             "program_label": program_label or "Programa no registrado",
             "photo": save_candidate_photo(candidate_id, str(payload.get("photo") or "").strip()),
+            "photo_fit": str(payload.get("photo_fit") or "cover").strip(),
+            "photo_position": str(payload.get("photo_position") or "center 35%").strip(),
+            "photo_size": str(payload.get("photo_size") or payload.get("photo_fit") or "cover").strip(),
             "proposal": str(payload.get("proposal") or "").strip(),
         }
     )
@@ -218,7 +258,18 @@ def delete_candidate(candidate_id: str) -> dict[str, str]:
 
 
 def update_candidate(candidate_id: str, payload: dict[str, Any]) -> dict[str, str]:
-    editable_fields = {"name", "journey", "ficha", "program", "program_label", "photo", "proposal"}
+    editable_fields = {
+        "name",
+        "journey",
+        "ficha",
+        "program",
+        "program_label",
+        "photo",
+        "photo_fit",
+        "photo_position",
+        "photo_size",
+        "proposal",
+    }
     candidates = load_candidates()
     for candidate in candidates:
         if candidate["id"] == candidate_id:
@@ -233,8 +284,12 @@ def update_candidate(candidate_id: str, payload: dict[str, Any]) -> dict[str, st
 
 def load_vote_store() -> dict[str, Any]:
     ensure_data_files()
-    with VOTES_FILE.open("r", encoding="utf-8-sig") as file:
-        raw_data: Any = json.load(file)
+    try:
+        with VOTES_FILE.open("r", encoding="utf-8-sig") as file:
+            raw_data: Any = json.load(file)
+    except (JSONDecodeError, OSError, ValueError):
+        save_vote_store(EMPTY_STORE.copy())
+        return EMPTY_STORE.copy()
 
     if isinstance(raw_data, dict) and "votes" in raw_data and "last_id" in raw_data:
         return {"last_id": int(raw_data["last_id"]), "votes": list(raw_data["votes"])}
@@ -245,7 +300,7 @@ def load_vote_store() -> dict[str, Any]:
 
 def save_vote_store(store: dict[str, Any]) -> None:
     DATA_DIR.mkdir(parents=True, exist_ok=True)
-    VOTES_FILE.write_text(json.dumps(store, indent=2, ensure_ascii=False), encoding="utf-8")
+    write_json_text(VOTES_FILE, json.dumps(store, indent=2, ensure_ascii=False))
 
 
 def candidate_by_id(candidate_id: str) -> dict[str, str] | None:

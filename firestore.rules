@@ -1,0 +1,56 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /votos/{voteId} {
+      allow read: if true;
+      allow create: if request.resource.data.keys().hasOnly([
+        'candidate_id',
+        'journey',
+        'program',
+        'created_at',
+        'source'
+      ])
+      && request.resource.data.candidate_id is string
+      && request.resource.data.journey in ['Diurna', 'Mixta', 'Virtual']
+      && request.resource.data.program is string
+      && request.resource.data.source == 'web';
+      allow update, delete: if false;
+    }
+
+    match /candidatos/{candidateId} {
+      allow read: if true;
+      allow create, update: if request.resource.data.keys().hasOnly([
+        'id',
+        'number',
+        'name',
+        'journey',
+        'ficha',
+        'program',
+        'program_label',
+        'photo',
+        'photo_fit',
+        'photo_position',
+        'photo_size',
+        'proposal'
+      ])
+      && request.resource.data.id is string
+      && request.resource.data.number is string
+      && request.resource.data.name is string
+      && request.resource.data.journey in ['Diurna', 'Mixta', 'Virtual', 'Todas']
+      && request.resource.data.ficha is string
+      && request.resource.data.program is string
+      && request.resource.data.program_label is string
+      && request.resource.data.photo is string
+      && request.resource.data.photo_fit in ['cover', 'contain']
+      && request.resource.data.photo_position is string
+      && request.resource.data.photo_size is string
+      && request.resource.data.proposal is string;
+      allow delete: if candidateId != 'blanco';
+    }
+
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

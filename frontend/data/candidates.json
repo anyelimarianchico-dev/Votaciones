@@ -8,6 +8,9 @@
     "program": "tecnologo-en-analisis-y-desarrollo-de-software",
     "program_label": "Tecnólogo en Análisis y Desarrollo de Software",
     "photo": "assets/candidate-ruth.jpg",
+    "photo_fit": "cover",
+    "photo_position": "center 35%",
+    "photo_size": "cover",
     "proposal": "Fortalecer la comunicación entre aprendices e instructores, crear espacios de apoyo académico y promover actividades de integración para la jornada diurna."
   },
   {
@@ -19,6 +22,9 @@
     "program": "contabilizacion-de-operaciones",
     "program_label": "Técnico en Contabilización de Operaciones",
     "photo": "assets/candidate-carlos.png",
+    "photo_fit": "cover",
+    "photo_position": "center 35%",
+    "photo_size": "cover",
     "proposal": "Impulsar jornadas de acompañamiento para proyectos formativos, mejorar la organización de horarios y abrir canales de escucha para aprendices de jornada mixta."
   },
   {
@@ -30,6 +36,9 @@
     "program": "analisis-y-desarrollo-de-software",
     "program_label": "Tecnólogo en Análisis y Desarrollo de Software",
     "photo": "assets/candidate-diana.png",
+    "photo_fit": "cover",
+    "photo_position": "center 35%",
+    "photo_size": "cover",
     "proposal": "Crear grupos de apoyo virtual, promover encuentros de seguimiento académico y facilitar la participación de aprendices que estudian desde casa."
   },
   {
@@ -41,6 +50,9 @@
     "program": "contabilizacion-de-operaciones",
     "program_label": "Técnico en Contabilización de Operaciones",
     "photo": "assets/candidate-andres.png",
+    "photo_fit": "cover",
+    "photo_position": "center 35%",
+    "photo_size": "cover",
     "proposal": "Gestionar actividades de bienestar, apoyar la participación en eventos institucionales y representar necesidades de los aprendices ante coordinación."
   },
   {
@@ -52,6 +64,9 @@
     "program": "sistemas-integrados-de-gestion",
     "program_label": "Sistemas Integrados de Gestión",
     "photo": "assets/candidate-mijal.png",
+    "photo_fit": "cover",
+    "photo_position": "center 35%",
+    "photo_size": "cover",
     "proposal": "Gestionar las necesidades de los aprendices."
   },
   {
@@ -60,9 +75,12 @@
     "name": "Oreste Suárez",
     "journey": "Mixta",
     "ficha": "3115086",
-    "program": "tecnologo-en-analisis-y-desarrollo-de-software",
+    "program": "tecnólogo-en-análisis-y-desarrollo-de-software",
     "program_label": "Tecnólogo en Análisis y Desarrollo de Software",
-    "photo": "assets/candidate-candidate-af6c81b0.jpg",
+    "photo": "assets/candidate-candidate-af6c81b0-d0d7b0c9.jpg",
+    "photo_fit": "cover",
+    "photo_position": "36.666666666666664% 64.6666653951009%",
+    "photo_size": "100%",
     "proposal": "Gestionar que los recursos se usen para mejorar la batería sanitaria del centro de formación."
   },
   {
@@ -74,6 +92,9 @@
     "program": "todos",
     "program_label": "Todos los programas",
     "photo": "",
+    "photo_fit": "cover",
+    "photo_position": "center 35%",
+    "photo_size": "cover",
     "proposal": "El voto en blanco permite participar sin apoyar una candidatura específica."
   }
 ]

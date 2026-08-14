@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from io import BytesIO
+from datetime import timedelta
 from pathlib import Path
 
 from flask import Flask, jsonify, redirect, request, send_file, send_from_directory, session
@@ -19,16 +20,13 @@ FRONTEND_DIR = ROOT_DIR / "frontend"
 
 app = Flask(__name__, static_folder=str(FRONTEND_DIR), static_url_path="")
 app.config["SECRET_KEY"] = "sena-vota-admin-session-2026"
+app.config["PERMANENT_SESSION_LIFETIME"] = timedelta(hours=8)
 CORS(app, supports_credentials=True)
 
 ADMIN_PASSWORD = "Adminos_2026"
 ADMIN_PAGE_PATHS = {
     "/admin",
     "/admin.html",
-    "/resultados",
-    "/resultados.html",
-    "/reportes",
-    "/reportes.html",
 }
 ADMIN_OPEN_PATHS = {
     "/admin-login",
@@ -55,9 +53,15 @@ def requires_admin_access() -> bool:
     return False
 
 
+def has_admin_access() -> bool:
+    if session.get("admin_authenticated"):
+        return True
+    return request.headers.get("X-Admin-Key") == ADMIN_PASSWORD
+
+
 @app.before_request
 def protect_admin_area():
-    if not requires_admin_access() or session.get("admin_authenticated"):
+    if not requires_admin_access() or has_admin_access():
         return None
     if request.path.startswith("/api/"):
         return jsonify({"message": "Clave de acceso requerida"}), 401
@@ -66,7 +70,7 @@ def protect_admin_area():
 
 @app.after_request
 def prevent_admin_cache(response):
-    if request.path in ADMIN_PAGE_PATHS or request.path in ADMIN_OPEN_PATHS or request.path.startswith("/api/admin"):
+    if request.path.startswith("/api/") or request.path in ADMIN_PAGE_PATHS or request.path in ADMIN_OPEN_PATHS:
         response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
         response.headers["Pragma"] = "no-cache"
         response.headers["Expires"] = "0"
@@ -79,7 +83,7 @@ def home():
 
 
 def clean_admin_next(raw_next: str | None) -> str:
-    allowed = {"admin.html", "/admin.html", "/admin", "resultados.html", "/resultados.html", "reportes.html", "/reportes.html"}
+    allowed = {"admin.html", "/admin.html", "/admin"}
     next_page = raw_next or "admin.html"
     if next_page not in allowed:
         return "admin.html"
@@ -100,6 +104,7 @@ def admin_login_form():
     next_page = clean_admin_next(request.form.get("next"))
     if password != ADMIN_PASSWORD:
         return redirect(f"/admin-login.html?error=1&next={next_page}")
+    session.permanent = True
     session["admin_authenticated"] = True
     return redirect(f"/{next_page}")
 
@@ -110,6 +115,7 @@ def admin_login():
     password = str(payload.get("password") or "").strip()
     if password != ADMIN_PASSWORD:
         return jsonify({"message": "Clave incorrecta"}), 401
+    session.permanent = True
     session["admin_authenticated"] = True
     return jsonify({"message": "Acceso permitido"})
 
@@ -126,18 +132,21 @@ def admin_session():
 
 
 @app.get("/votar")
+@app.get("/votar.html")
 def vote_page():
-    return send_page("votar.html")
+    return redirect("/")
 
 
 @app.get("/revision")
+@app.get("/revision.html")
 def review_page():
-    return send_page("revision.html")
+    return redirect("/")
 
 
 @app.get("/confirmacion")
+@app.get("/confirmacion.html")
 def confirmation_page():
-    return send_page("confirmacion.html")
+    return redirect("/")
 
 
 @app.get("/admin")
@@ -146,33 +155,39 @@ def admin_page():
 
 
 @app.get("/resultados")
+@app.get("/resultados.html")
 def results_page():
-    return send_page("resultados.html")
+    return redirect("/admin.html")
 
 
 @app.get("/reportes")
+@app.get("/reportes.html")
 def reports_page():
-    return send_page("reportes.html")
+    return redirect("/admin.html")
 
 
 @app.get("/ayuda")
+@app.get("/ayuda.html")
 def help_page():
-    return send_page("ayuda.html")
+    return redirect("/")
 
 
 @app.get("/privacidad")
+@app.get("/privacidad.html")
 def privacy_page():
-    return send_page("privacidad.html")
+    return redirect("/")
 
 
 @app.get("/terminos")
+@app.get("/terminos.html")
 def terms_page():
-    return send_page("terminos.html")
+    return redirect("/")
 
 
 @app.get("/transparencia")
+@app.get("/transparencia.html")
 def transparency_page():
-    return send_page("transparencia.html")
+    return redirect("/")
 
 
 @app.get("/api/candidates")

@@ -7,7 +7,10 @@ const storageKeys = {
 };
 
 const localBackendOrigin = "http://127.0.0.1:5000";
-const staticDataVersion = "2026-08-10-2";
+const staticDataVersion = "2026-08-14-photos";
+const requestTimeoutMs = 30000;
+const adminAccessKey = "Adminos_2026";
+let firebaseServicePromise;
 
 function isApiPath(url) {
   return typeof url === "string" && url.startsWith("/api/");
@@ -21,8 +24,28 @@ function apiEndpoint(url) {
 
 function adminLoginUrl(nextPage = "admin.html") {
   const isFlaskOrigin = ["127.0.0.1:5000", "localhost:5000"].includes(window.location.host);
-  const base = isFlaskOrigin ? "" : localBackendOrigin;
+  const base = isFlaskOrigin ? "" : ".";
   return `${base}/admin-login.html?next=${encodeURIComponent(nextPage)}`;
+}
+
+async function fetchWithTimeout(url, options = {}) {
+  const controller = new AbortController();
+  const timeoutId = window.setTimeout(() => controller.abort(), requestTimeoutMs);
+  try {
+    return await fetch(url, { ...options, signal: controller.signal });
+  } finally {
+    window.clearTimeout(timeoutId);
+  }
+}
+
+function adminRequestHeaders() {
+  const headers = {};
+  const adminKey = sessionStorage.getItem("sena_admin_key")
+    || (sessionStorage.getItem("sena_admin_authenticated") === "true" ? adminAccessKey : "");
+  if (adminKey) {
+    headers["X-Admin-Key"] = adminKey;
+  }
+  return headers;
 }
 
 const fallbackCandidates = [
@@ -131,6 +154,101 @@ function buildFallbackResults(candidateSource = fallbackCandidates) {
   };
 }
 
+function firebaseService() {
+  if (!firebaseServicePromise) {
+    firebaseServicePromise = import("./firebase-service.js").catch(() => null);
+  }
+  return firebaseServicePromise;
+}
+
+function buildResultsFromVotes(candidateSource, votes) {
+  const counts = { ...initialVotes };
+  candidateSource.forEach((candidate) => {
+    counts[candidate.id] = counts[candidate.id] || 0;
+  });
+
+  votes.forEach((vote) => {
+    const candidateId = vote.candidate_id;
+    if (candidateId in counts) {
+      counts[candidateId] += 1;
+    }
+  });
+
+  const total = Object.values(counts).reduce((sum, value) => sum + value, 0);
+  const candidates = candidateSource
+    .map((candidate) => ({
+      ...candidate,
+      votes: counts[candidate.id] || 0,
+      percentage: total ? Math.round(((counts[candidate.id] || 0) / total) * 1000) / 10 : 0,
+    }))
+    .sort((a, b) => b.votes - a.votes);
+
+  return {
+    total,
+    last_update: new Date().toLocaleString("es-CO"),
+    last_vote_id: votes.length,
+    candidates,
+    participation: ["Diurna", "Mixta", "Virtual"].map((journey) => {
+      const count = votes.filter((vote) => vote.journey === journey).length;
+      return {
+        label: `Jornada ${journey}`,
+        votes: count,
+        percentage: total ? Math.round((count / total) * 1000) / 10 : 0,
+      };
+    }),
+    vote_records: votes,
+  };
+}
+
+async function firebaseResponse(url, options = {}) {
+  let service;
+  try {
+    service = await firebaseService();
+  } catch {
+    return null;
+  }
+  if (!service?.firebaseIsReady()) return null;
+
+  try {
+    const candidates = await staticCandidates();
+    if (url.includes("/api/candidates") && (!options.method || options.method === "GET")) {
+      return service.loadCandidatesFromFirebase(candidates);
+    }
+    if (url.includes("/api/candidates/") && options.method === "DELETE") {
+      const candidateId = decodeURIComponent(url.split("/").pop());
+      const candidate = await service.deleteCandidateFromFirebase(candidateId);
+      return { message: "Candidato eliminado", candidate };
+    }
+    if (url.includes("/api/candidates")) {
+      const currentCandidates = await service.loadCandidatesFromFirebase(candidates);
+      const payload = JSON.parse(options.body || "{}");
+      const candidateId = url.includes("/api/candidates/") ? decodeURIComponent(url.split("/").pop()) : "";
+      const candidate = await service.saveCandidateToFirebase(payload, currentCandidates, candidateId);
+      return {
+        message: candidateId ? "Candidato actualizado" : "Candidato creado",
+        candidate,
+      };
+    }
+    if (url.includes("/api/vote") && options.method === "POST") {
+      const payload = JSON.parse(options.body || "{}");
+      const vote = await service.saveVoteToFirebase(payload);
+      const votes = await service.loadVotesFromFirebase();
+      return {
+        message: "Voto registrado correctamente en Firebase",
+        vote,
+        results: buildResultsFromVotes(candidates, votes),
+      };
+    }
+    if (url.includes("/api/results") || url.includes("/api/reports")) {
+      const votes = await service.loadVotesFromFirebase();
+      return buildResultsFromVotes(candidates, votes);
+    }
+  } catch (error) {
+    console.error(error);
+  }
+  return null;
+}
+
 async function fallbackResponse(url, options = {}) {
   if (url.includes("/api/candidates") && ["POST", "PUT", "DELETE"].includes(options.method)) {
     throw new Error("Para administrar candidatos, inicia el backend Flask.");
@@ -153,12 +271,19 @@ async function fallbackResponse(url, options = {}) {
 }
 
 async function getJson(url, options = {}) {
+  if (isApiPath(url)) {
+    const firebaseData = await firebaseResponse(url, options);
+    if (firebaseData) return firebaseData;
+  }
+
   let response;
   try {
-    response = await fetch(apiEndpoint(url), {
-      headers: { "Content-Type": "application/json" },
+    const headers = { "Content-Type": "application/json", ...adminRequestHeaders(), ...(options.headers || {}) };
+    response = await fetchWithTimeout(apiEndpoint(url), {
       credentials: "include",
+      cache: "no-store",
       ...options,
+      headers,
     });
   } catch {
     return fallbackResponse(url, options);
@@ -166,9 +291,6 @@ async function getJson(url, options = {}) {
 
   if (!response.ok) {
     if (response.status === 401) {
-      if (url.includes("/api/results") || url.includes("/api/reports") || (url.includes("/api/candidates") && options.method)) {
-        window.location.replace(adminLoginUrl(window.location.pathname.split("/").pop() || "admin.html"));
-      }
       throw new Error("Clave de acceso requerida");
     }
     const error = await response.json().catch(() => ({ message: "Error de servidor" }));
@@ -215,8 +337,8 @@ function initJourneySelection() {
 function candidateMarkup(candidate) {
   const isBlank = candidate.id === "blanco";
   const media = candidate.photo
-    ? `<img class="candidate-photo" src="${candidate.photo}" alt="Fotografía de ${candidate.name}">`
-    : `<span class="candidate-placeholder">${isBlank ? '<i class="bi bi-check2-square fs-1"></i>' : initials(candidate.name)}</span>`;
+    ? `<span class="candidate-photo-frame"><img class="candidate-photo" src="${versionedPhotoUrl(candidate)}" alt="Fotografía de ${candidate.name}" style="${candidateImageStyle(candidate)}" onerror="this.style.display='none'; this.nextElementSibling.style.opacity='1';"><span class="photo-fallback-text">${initials(candidate.name)}</span></span>`
+    : `<span class="candidate-photo-frame candidate-placeholder">${isBlank ? '<i class="bi bi-check2-square fs-1"></i>' : initials(candidate.name)}</span>`;
 
   return `
     <div class="col-md-6 col-xl-4">
@@ -247,6 +369,172 @@ function candidateMarkup(candidate) {
 
 function candidateProposal(candidate) {
   return candidate.proposal?.trim() || "Propuesta no registrada en el sistema.";
+}
+
+async function initSimpleVotingPage() {
+  const root = document.querySelector("#simpleVotingPage");
+  const grid = document.querySelector("#simpleCandidateGrid");
+  const continueButton = document.querySelector("#simpleContinueVote");
+  if (!root || !grid || !continueButton) return;
+
+  const journeyButtons = Array.from(document.querySelectorAll(".simple-journey-btn"));
+  const journeyLabel = document.querySelector("#simpleJourneyLabel");
+  const selectedName = document.querySelector("#simpleSelectedCandidate");
+  const selectedDetail = document.querySelector("#simpleSelectedDetail");
+  const reviewPanel = document.querySelector("#simpleReviewPanel");
+  const confirmationPanel = document.querySelector("#simpleConfirmationPanel");
+  const confirmButton = document.querySelector("#simpleConfirmVote");
+  const editButton = document.querySelector("#simpleEditVote");
+
+  let selectedJourney = localStorage.getItem(storageKeys.journey) || "Diurna";
+  let selectedCandidate = null;
+  let allCandidates = await getJson("/api/candidates");
+  let candidateSignature = JSON.stringify(allCandidates.map((candidate) => [
+    candidate.id,
+    candidate.name,
+    candidate.journey,
+    candidate.program_label,
+    candidate.photo,
+    candidate.photo_position,
+    candidate.photo_size,
+    candidate.proposal,
+  ]));
+
+  const resetSelection = (hideConfirmation = true) => {
+    selectedCandidate = null;
+    continueButton.disabled = true;
+    selectedName.textContent = "Selecciona un candidato";
+    selectedDetail.textContent = "Todavía no hay una opción marcada.";
+    reviewPanel?.classList.add("d-none");
+    if (hideConfirmation) confirmationPanel?.classList.add("d-none");
+  };
+
+  const candidatesForJourney = () => [
+    ...allCandidates.filter((candidate) => candidate.id !== "blanco" && candidate.journey === selectedJourney),
+    ...allCandidates.filter((candidate) => candidate.id === "blanco"),
+  ];
+
+  const renderCandidates = (preserveSelection = false) => {
+    const previousCandidateId = selectedCandidate?.id || "";
+    const candidates = candidatesForJourney();
+    journeyLabel.textContent = `Jornada ${selectedJourney}`;
+    journeyButtons.forEach((button) => button.classList.toggle("active", button.dataset.journey === selectedJourney));
+    grid.innerHTML = candidates.map(candidateMarkup).join("");
+    if (preserveSelection && previousCandidateId && candidates.some((candidate) => candidate.id === previousCandidateId)) {
+      selectCandidate(previousCandidateId);
+    } else {
+      resetSelection();
+    }
+  };
+
+  const selectCandidate = (candidateId) => {
+    selectedCandidate = candidatesForJourney().find((candidate) => candidate.id === candidateId);
+    if (!selectedCandidate) return;
+    root.querySelectorAll(".candidate-card").forEach((card) => card.classList.remove("selected"));
+    const radio = root.querySelector(`input[value="${candidateId}"]`);
+    radio.checked = true;
+    radio.closest(".candidate-card").classList.add("selected");
+    selectedName.textContent = selectedCandidate.name;
+    selectedDetail.textContent = `${selectedCandidate.journey} · ${selectedCandidate.program_label}`;
+    continueButton.disabled = false;
+    confirmationPanel?.classList.add("d-none");
+  };
+
+  journeyButtons.forEach((button) => {
+    button.addEventListener("click", () => {
+      selectedJourney = button.dataset.journey;
+      localStorage.setItem(storageKeys.journey, selectedJourney);
+      renderCandidates();
+    });
+  });
+
+  grid.addEventListener("click", (event) => {
+    const selectButton = event.target.closest(".select-candidate");
+    const profileButton = event.target.closest(".view-profile");
+
+    if (selectButton) {
+      selectCandidate(selectButton.dataset.candidate);
+    }
+
+    if (profileButton) {
+      const candidate = candidatesForJourney().find((item) => item.id === profileButton.dataset.candidate);
+      const modal = document.querySelector("#proposalModal");
+      if (!candidate || !modal) return;
+      modal.querySelector(".modal-title").textContent = candidate.name;
+      modal.querySelector("#proposalText").textContent = candidateProposal(candidate);
+      bootstrap.Modal.getOrCreateInstance(modal).show();
+    }
+  });
+
+  continueButton.addEventListener("click", () => {
+    if (!selectedCandidate || !reviewPanel) return;
+    document.querySelector("#simpleReviewCandidate").textContent = selectedCandidate.name;
+    document.querySelector("#simpleReviewProposal").textContent = candidateProposal(selectedCandidate);
+    reviewPanel.classList.remove("d-none");
+    reviewPanel.scrollIntoView({ behavior: "smooth", block: "nearest" });
+  });
+
+  editButton?.addEventListener("click", () => {
+    reviewPanel?.classList.add("d-none");
+    root.scrollIntoView({ behavior: "smooth", block: "start" });
+  });
+
+  confirmButton?.addEventListener("click", async () => {
+    if (!selectedCandidate) return;
+    const originalLabel = confirmButton.innerHTML;
+    confirmButton.disabled = true;
+    confirmButton.innerHTML = `<span class="spinner-border spinner-border-sm me-2" aria-hidden="true"></span>Guardando`;
+
+    try {
+      const response = await getJson("/api/vote", {
+        method: "POST",
+        body: JSON.stringify({
+          candidate_id: selectedCandidate.id,
+          journey: selectedJourney,
+          program: selectedCandidate.program,
+        }),
+      });
+      const ticket = response.vote?.id ? `SV-${String(response.vote.id).padStart(6, "0")}` : `SV-${Date.now().toString().slice(-8)}`;
+      document.querySelector("#simpleTicketNumber").textContent = ticket;
+      resetSelection(false);
+      renderCandidates();
+      confirmationPanel?.classList.remove("d-none");
+      confirmationPanel?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    } catch (error) {
+      window.alert(`No se pudo guardar el voto: ${error.message}`);
+    } finally {
+      confirmButton.disabled = false;
+      confirmButton.innerHTML = originalLabel;
+    }
+  });
+
+  const refreshCandidateCards = async () => {
+    try {
+      const nextCandidates = await getJson("/api/candidates");
+      const nextSignature = JSON.stringify(nextCandidates.map((candidate) => [
+        candidate.id,
+        candidate.name,
+        candidate.journey,
+        candidate.program_label,
+        candidate.photo,
+        candidate.photo_position,
+        candidate.photo_size,
+        candidate.proposal,
+      ]));
+      if (nextSignature === candidateSignature) return;
+      allCandidates = nextCandidates;
+      candidateSignature = nextSignature;
+      renderCandidates(Boolean(selectedCandidate));
+    } catch (error) {
+      console.error(error);
+    }
+  };
+
+  renderCandidates();
+  window.setInterval(refreshCandidateCards, 5000);
+  document.addEventListener("visibilitychange", () => {
+    if (!document.hidden) refreshCandidateCards();
+  });
 }
 
 async function initVotingForm() {
@@ -319,7 +607,7 @@ async function initVotingForm() {
       })
     );
 
-    window.location.href = "revision.html";
+    window.location.href = "index.html";
   });
 }
 
@@ -375,7 +663,7 @@ function initReview() {
         })
       );
 
-      window.location.href = "confirmacion.html";
+      window.location.href = "index.html";
     } catch (error) {
       button.disabled = false;
       button.innerHTML = originalLabel;
@@ -450,15 +738,28 @@ async function initResults() {
   const totalVotes = document.querySelector("#totalVotes");
   const candidateSummary = document.querySelector("#candidateSummary");
   if (!totalVotes || !candidateSummary) return;
+  let isLoading = false;
 
   const loadResults = async () => {
-    const data = await getJson("/api/results");
+    if (isLoading) return;
+    isLoading = true;
     const lastUpdate = document.querySelector("#lastUpdate");
-    if (lastUpdate) lastUpdate.textContent = data.last_update;
-    totalVotes.textContent = formatNumber.format(data.total);
-    candidateSummary.innerHTML = data.candidates.map(renderCandidateSummary).join("");
-    const participationList = document.querySelector("#participationList");
-    if (participationList) participationList.innerHTML = data.participation.map(renderParticipation).join("");
+    try {
+      const data = await getJson("/api/results");
+      if (lastUpdate) lastUpdate.textContent = data.last_update || new Date().toLocaleString("es-CO");
+      totalVotes.textContent = formatNumber.format(data.total || 0);
+      candidateSummary.innerHTML = data.candidates.length
+        ? data.candidates.map(renderCandidateSummary).join("")
+        : `<div class="alert alert-warning mb-0">No hay candidatos para mostrar.</div>`;
+      const participationList = document.querySelector("#participationList");
+      if (participationList) participationList.innerHTML = data.participation.map(renderParticipation).join("");
+    } catch (error) {
+      if (lastUpdate) lastUpdate.textContent = "No se pudo actualizar";
+      candidateSummary.innerHTML = `<div class="alert alert-warning mb-0">No se pudieron cargar los resultados. Revisa la conexión o Firebase.</div>`;
+      console.error(error);
+    } finally {
+      isLoading = false;
+    }
   };
 
   await loadResults();
@@ -481,6 +782,51 @@ function splitFullName(name) {
   const parts = name.trim().split(/\s+/).filter(Boolean);
   if (parts.length <= 1) return { firstName: name.trim(), lastName: "" };
   return { firstName: parts[0], lastName: parts.slice(1).join(" ") };
+}
+
+function versionedPhotoUrl(candidate) {
+  const photo = candidate?.photo || "";
+  if (!photo || photo.startsWith("data:")) return photo;
+  const version = encodeURIComponent([photo, candidate.photo_position || "", candidate.photo_size || ""].join("|"));
+  return `${photo}${photo.includes("?") ? "&" : "?"}v=${version}`;
+}
+
+function candidatePhotoStyle(candidate) {
+  if (!candidate?.photo) return "";
+  const fit = candidate.photo_fit || "cover";
+  const position = candidate.photo_position || (fit === "contain" ? "center center" : "center 35%");
+  const rawSize = candidate.photo_size || fit;
+  const size = ["cover", "contain"].includes(rawSize) ? rawSize : rawSize;
+  return `background-image: url('${versionedPhotoUrl(candidate)}'); background-size: ${size}; background-position: ${position};`;
+}
+
+function candidateImageStyle(candidate) {
+  const fit = candidate.photo_fit === "contain" ? "contain" : "cover";
+  const position = candidate.photo_position || (fit === "contain" ? "center center" : "center 35%");
+  const rawSize = candidate.photo_size || "100%";
+  const zoom = rawSize.endsWith("%") ? Math.max(1, Number(rawSize.replace("%", "")) / 100) : 1;
+  return `object-fit: ${fit}; object-position: ${position}; transform: scale(${zoom});`;
+}
+
+function setPhotoPreview(element, photo, fit = "cover", position = "center 35%", size = fit) {
+  if (!element) return;
+  element.style.backgroundImage = photo ? `url("${photo}")` : "";
+  element.style.backgroundSize = size;
+  element.style.backgroundPosition = position;
+  element.classList.toggle("has-photo", Boolean(photo));
+}
+
+function forceCloseModal(modal) {
+  if (!modal) return;
+  bootstrap.Modal.getInstance(modal)?.hide();
+  modal.classList.remove("show");
+  modal.setAttribute("aria-hidden", "true");
+  modal.removeAttribute("aria-modal");
+  modal.style.display = "none";
+  document.body.classList.remove("modal-open");
+  document.body.style.removeProperty("overflow");
+  document.body.style.removeProperty("padding-right");
+  document.querySelectorAll(".modal-backdrop").forEach((backdrop) => backdrop.remove());
 }
 
 function renderReportRow(candidate) {
@@ -532,10 +878,20 @@ async function initReports() {
   const table = document.querySelector("#reportTable");
   if (!table) return;
 
-  let data = await getJson("/api/reports");
+  let data;
+  try {
+    data = await getJson("/api/reports");
+  } catch (error) {
+    table.innerHTML = `<tr><td colspan="3" class="text-center text-secondary py-4">No se pudieron cargar los reportes.</td></tr>`;
+    document.querySelector("#reportTotal").textContent = "0";
+    document.querySelector("#reportCount").textContent = "Sin conexión";
+    console.error(error);
+    return;
+  }
   let currentRows = data.candidates;
   let currentJourney = "todas";
   let currentProgram = "todos";
+  let isRefreshing = false;
 
   const render = () => {
     table.innerHTML = currentRows.map(renderReportRow).join("");
@@ -555,8 +911,17 @@ async function initReports() {
   };
 
   const refreshReports = async () => {
-    data = await getJson("/api/reports");
-    applyFilters();
+    if (isRefreshing) return;
+    isRefreshing = true;
+    try {
+      data = await getJson("/api/reports");
+      applyFilters();
+    } catch (error) {
+      document.querySelector("#reportCount").textContent = "No se pudo actualizar";
+      console.error(error);
+    } finally {
+      isRefreshing = false;
+    }
   };
 
   render();
@@ -591,7 +956,7 @@ function initHelp() {
 
 function renderAdminCandidate(candidate, isActive = false) {
   const photo = candidate.photo
-    ? `<img class="avatar" src="${candidate.photo}" alt="Foto de ${candidate.name}">`
+    ? `<span class="avatar-frame"><img class="candidate-avatar-img" src="${versionedPhotoUrl(candidate)}" alt="Foto de ${candidate.name}" style="${candidateImageStyle(candidate)}" onerror="this.style.display='none'; this.nextElementSibling.style.opacity='1';"><span class="photo-fallback-text">${initials(candidate.name)}</span></span>`
     : `<span class="avatar">${candidate.id === "blanco" ? "VB" : initials(candidate.name)}</span>`;
 
   return `
@@ -614,8 +979,17 @@ function fillCandidateEditor(candidate) {
   document.querySelector("#editFicha").value = candidate.ficha || "";
   document.querySelector("#editProgramLabel").value = candidate.program_label || "";
   document.querySelector("#editPhoto").value = candidate.photo || "";
+  document.querySelector("#editPhotoFit").value = candidate.photo_fit || "cover";
+  document.querySelector("#editPhotoPosition").value = candidate.photo_position || "center 35%";
+  document.querySelector("#editPhotoSize").value = candidate.photo_size || candidate.photo_fit || "cover";
   document.querySelector("#editPhotoFile").value = "";
-  document.querySelector("#candidatePhotoPreview").src = candidate.photo || "";
+  setPhotoPreview(
+    document.querySelector("#candidatePhotoPreview"),
+    versionedPhotoUrl(candidate),
+    candidate.photo_fit || "cover",
+    candidate.photo_position || "center 35%",
+    candidate.photo_size || candidate.photo_fit || "cover"
+  );
   document.querySelector("#editProposal").value = candidate.proposal || "";
   document.querySelector("#deleteCandidateBtn").classList.toggle("d-none", candidate.id === "blanco");
   document.querySelector("#saveCandidateBtn").innerHTML = `<i class="bi bi-save me-2"></i>Actualizar candidato`;
@@ -630,8 +1004,11 @@ function clearCandidateEditor() {
   document.querySelector("#editFicha").value = "";
   document.querySelector("#editProgramLabel").value = "";
   document.querySelector("#editPhoto").value = "";
+  document.querySelector("#editPhotoFit").value = "cover";
+  document.querySelector("#editPhotoPosition").value = "center 35%";
+  document.querySelector("#editPhotoSize").value = "100%";
   document.querySelector("#editPhotoFile").value = "";
-  document.querySelector("#candidatePhotoPreview").src = "";
+  setPhotoPreview(document.querySelector("#candidatePhotoPreview"), "");
   document.querySelector("#editProposal").value = "";
   document.querySelector("#deleteCandidateBtn").classList.add("d-none");
   document.querySelector("#saveCandidateBtn").innerHTML = `<i class="bi bi-save me-2"></i>Guardar candidato`;
@@ -643,6 +1020,11 @@ async function initAdminCandidateEditor() {
   const form = document.querySelector("#candidateEditorForm");
   const addButton = document.querySelector("#addCandidateBtn");
   const deleteButton = document.querySelector("#deleteCandidateBtn");
+  const saveButton = document.querySelector("#saveCandidateBtn");
+  const saveProgress = document.querySelector("#candidateSaveProgress");
+  const saveProgressBar = document.querySelector("#candidateSaveProgressBar");
+  const saveProgressLabel = document.querySelector("#candidateSaveProgressLabel");
+  const saveProgressPercent = document.querySelector("#candidateSaveProgressPercent");
   if (!list || !form) return;
 
   let candidates = await getJson("/api/candidates");
@@ -661,8 +1043,52 @@ async function initAdminCandidateEditor() {
     else clearCandidateEditor();
   };
 
+  const setSaveProgress = (percent, label, visible = true) => {
+    if (!saveProgress || !saveProgressBar || !saveProgressLabel || !saveProgressPercent) return;
+    const safePercent = Math.min(100, Math.max(0, percent));
+    saveProgress.classList.toggle("d-none", !visible);
+    saveProgressBar.style.width = `${safePercent}%`;
+    saveProgressBar.parentElement?.setAttribute("aria-valuenow", String(safePercent));
+    saveProgressLabel.textContent = label;
+    saveProgressPercent.textContent = `${safePercent}%`;
+  };
+
   renderList();
   if (candidates[0]) fillCandidateEditor(candidates[0]);
+
+  let pendingPhoto = "";
+  let pendingPhotoFit = "cover";
+  let pendingPhotoX = 50;
+  let pendingPhotoY = 35;
+  let pendingPhotoZoom = 100;
+  let isDraggingPhoto = false;
+  let dragStartX = 0;
+  let dragStartY = 0;
+  let dragStartPhotoX = 50;
+  let dragStartPhotoY = 35;
+  const photoModal = document.querySelector("#photoConfirmModal");
+  const photoModalInstance = photoModal ? bootstrap.Modal.getOrCreateInstance(photoModal) : null;
+  const photoConfirmPreview = document.querySelector("#photoConfirmPreview");
+  const photoZoomRange = document.querySelector("#photoZoomRange");
+
+  const pendingPhotoPosition = () => `${pendingPhotoX}% ${pendingPhotoY}%`;
+  const pendingPhotoSize = () => (pendingPhotoFit === "contain" ? "contain" : `${pendingPhotoZoom}%`);
+  const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
+
+  const renderPendingPhoto = () => {
+    setPhotoPreview(photoConfirmPreview, pendingPhoto, pendingPhotoFit, pendingPhotoPosition(), pendingPhotoSize());
+    if (photoZoomRange) {
+      photoZoomRange.value = String(pendingPhotoZoom);
+    }
+  };
+
+  const resetPendingPhoto = () => {
+    pendingPhotoFit = "cover";
+    pendingPhotoX = 50;
+    pendingPhotoY = 35;
+    pendingPhotoZoom = 100;
+    renderPendingPhoto();
+  };
 
   addButton?.addEventListener("click", () => {
     selectedCandidateId = "";
@@ -673,13 +1099,66 @@ async function initAdminCandidateEditor() {
   document.querySelector("#editPhotoFile").addEventListener("change", (event) => {
     const file = event.target.files?.[0];
     if (!file) return;
+    setSaveProgress(10, "Leyendo la foto seleccionada...");
+    document.querySelector("#candidateEditorStatus").textContent = "Leyendo la foto seleccionada...";
     const reader = new FileReader();
     reader.addEventListener("load", () => {
-      document.querySelector("#editPhoto").value = String(reader.result);
-      document.querySelector("#candidatePhotoPreview").src = String(reader.result);
-      document.querySelector("#candidateEditorStatus").textContent = "Foto cargada. Guarda cambios para aplicarla.";
+      pendingPhoto = String(reader.result);
+      resetPendingPhoto();
+      setSaveProgress(35, "Foto lista para ajustar.");
+      document.querySelector("#candidateEditorStatus").textContent = "Ajusta la foto y confirma para guardarla.";
+      photoModalInstance?.show();
+    });
+    reader.addEventListener("error", () => {
+      setSaveProgress(0, "No se pudo leer la foto.", false);
+      document.querySelector("#candidateEditorStatus").textContent = "No se pudo leer la foto. Intenta con otra imagen.";
     });
     reader.readAsDataURL(file);
+  });
+
+  photoConfirmPreview?.addEventListener("pointerdown", (event) => {
+    if (!pendingPhoto) return;
+    isDraggingPhoto = true;
+    dragStartX = event.clientX;
+    dragStartY = event.clientY;
+    dragStartPhotoX = pendingPhotoX;
+    dragStartPhotoY = pendingPhotoY;
+    photoConfirmPreview.classList.add("dragging");
+    photoConfirmPreview.setPointerCapture(event.pointerId);
+  });
+  photoConfirmPreview?.addEventListener("pointermove", (event) => {
+    if (!isDraggingPhoto) return;
+    const rect = photoConfirmPreview.getBoundingClientRect();
+    const deltaX = ((event.clientX - dragStartX) / rect.width) * 100;
+    const deltaY = ((event.clientY - dragStartY) / rect.height) * 100;
+    pendingPhotoX = clamp(dragStartPhotoX - deltaX, 0, 100);
+    pendingPhotoY = clamp(dragStartPhotoY - deltaY, 0, 100);
+    renderPendingPhoto();
+  });
+  ["pointerup", "pointercancel", "lostpointercapture"].forEach((eventName) => {
+    photoConfirmPreview?.addEventListener(eventName, () => {
+      isDraggingPhoto = false;
+      photoConfirmPreview.classList.remove("dragging");
+    });
+  });
+  photoZoomRange?.addEventListener("input", () => {
+    pendingPhotoFit = "cover";
+    pendingPhotoZoom = Number(photoZoomRange.value);
+    renderPendingPhoto();
+  });
+  document.querySelector("#photoApplyBtn")?.addEventListener("click", () => {
+    if (!pendingPhoto) {
+      forceCloseModal(photoModal);
+      return;
+    }
+    document.querySelector("#editPhoto").value = pendingPhoto;
+    document.querySelector("#editPhotoFit").value = pendingPhotoFit;
+    document.querySelector("#editPhotoPosition").value = pendingPhotoPosition();
+    document.querySelector("#editPhotoSize").value = pendingPhotoSize();
+    setPhotoPreview(document.querySelector("#candidatePhotoPreview"), pendingPhoto, pendingPhotoFit, pendingPhotoPosition(), pendingPhotoSize());
+    setSaveProgress(55, "Foto confirmada. Falta actualizar candidato.");
+    document.querySelector("#candidateEditorStatus").textContent = "Foto confirmada. Guarda cambios para aplicarla.";
+    forceCloseModal(photoModal);
   });
 
   list.addEventListener("click", (event) => {
@@ -724,20 +1203,39 @@ async function initAdminCandidateEditor() {
       program: programLabel.toLowerCase().replace(/\s+/g, "-") || "sin-programa",
       program_label: programLabel,
       photo: document.querySelector("#editPhoto").value,
+      photo_fit: document.querySelector("#editPhotoFit").value,
+      photo_position: document.querySelector("#editPhotoPosition").value,
+      photo_size: document.querySelector("#editPhotoSize").value,
       proposal: document.querySelector("#editProposal").value,
     };
 
     const status = document.querySelector("#candidateEditorStatus");
+    const originalButton = saveButton?.innerHTML || "";
+    if (saveButton) {
+      saveButton.disabled = true;
+      saveButton.innerHTML = `<span class="spinner-border spinner-border-sm me-2" aria-hidden="true"></span>Guardando`;
+    }
+    setSaveProgress(payload.photo.startsWith("data:image/") ? 65 : 45, payload.photo.startsWith("data:image/") ? "Subiendo y guardando la foto..." : "Guardando cambios...");
     status.textContent = "Guardando cambios...";
     try {
       const response = await getJson(candidateId ? `/api/candidates/${candidateId}` : "/api/candidates", {
         method: candidateId ? "PUT" : "POST",
         body: JSON.stringify(payload),
       });
+      forceCloseModal(photoModal);
+      setSaveProgress(90, "Actualizando la lista de candidatos...");
       await refreshCandidates(response.candidate.id);
+      setSaveProgress(100, "Candidato actualizado.");
       document.querySelector("#candidateEditorStatus").textContent = "Cambios guardados. El tarjetón local ya usa esta información.";
+      window.setTimeout(() => setSaveProgress(100, "Candidato actualizado.", false), 1200);
     } catch (error) {
+      setSaveProgress(0, error.message || "No se pudo guardar.", true);
       status.textContent = error.message;
+    } finally {
+      if (saveButton) {
+        saveButton.disabled = false;
+        saveButton.innerHTML = originalButton || `<i class="bi bi-save me-2"></i>Actualizar candidato`;
+      }
     }
   });
 }
@@ -745,6 +1243,7 @@ async function initAdminCandidateEditor() {
 document.addEventListener("DOMContentLoaded", () => {
   setActiveNav();
   initJourneySelection();
+  initSimpleVotingPage().catch((error) => console.error(error));
   initVotingForm().catch((error) => console.error(error));
   initReview();
   initConfirmation();

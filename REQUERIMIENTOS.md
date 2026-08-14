@@ -2,17 +2,17 @@
 
 ## Funcionales
 
-- Seleccionar la jornada de votacion: Diurna, Mixta o Virtual.
+- Seleccionar la jornada de votacion en la misma pantalla: Diurna, Mixta o Virtual.
 - Votar sin inicio de sesion.
 - Mostrar tarjeton con candidatos y opcion de voto en blanco.
-- Revisar la seleccion antes de confirmar el voto.
+- Continuar votacion despues de elegir candidato.
+- Revisar la seleccion antes de confirmar el voto en la misma pantalla.
 - Registrar un voto desde el frontend hacia el backend con ID autoincremental.
 - Mostrar comprobante de confirmacion.
-- Separar resultados y reportes del flujo de aprendices.
+- Separar resultados, reportes y administracion del flujo de aprendices.
 - Consultar resultados consolidados por candidato desde el apartado administrativo.
 - Visualizar participacion por jornada y modalidad desde administración.
 - Consultar reportes en tabla, filtrar por jornada, paginar y exportar CSV/PDF desde administración.
-- Navegar a apartados de ayuda, privacidad, terminos y transparencia.
 
 ## Tecnicos
 
@@ -21,6 +21,8 @@
 - CSS separado en `frontend/css/styles.css`.
 - Dependencias Python declaradas en `requirements.txt`.
 - Datos de votos persistidos localmente en `backend/data/votes.json` con estructura de registros.
+- Soporte opcional para Firebase Firestore como persistencia en la nube sin backend propio.
+- Configuración web de Firebase separada en `frontend/js/firebase-config.js`.
 - Logo local en `frontend/assets/logo-sena.png`.
 
 ## Estructura
@@ -32,9 +34,8 @@ backend/
   data/
 frontend/
   index.html
-  votar.html
-  resultados.html
-  reportes.html
+  admin.html
+  admin-login.html
   css/styles.css
   js/app.js
 requirements.txt
