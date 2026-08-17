@@ -1,5 +1,12 @@
-﻿{
-  "last_id": 0,
-  "votes": []
+{
+  "last_id": 1,
+  "votes": [
+    {
+      "id": 1,
+      "candidate_id": "blanco",
+      "journey": "Diurna",
+      "program": "todos",
+      "created_at": "2026-08-17T15:53:18"
+    }
+  ]
 }
-
